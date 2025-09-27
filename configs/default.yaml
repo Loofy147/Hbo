@@ -1,0 +1,38 @@
+# configs/default.yaml - ملف الإعدادات الافتراضي لنظام HPO
+
+# --- إعدادات عامة ---
+# المسار الذي سيتم حفظ التقارير فيه
+report_directory: "hpo_reports"
+
+# --- إعدادات الـ Samplers ---
+# هذه الإعدادات يتم تمريرها مباشرة إلى كائنات Optuna
+# لمزيد من التفاصيل، راجع توثيق Optuna
+
+# إعدادات TPE Sampler (Tree-structured Parzen Estimator)
+# يعتبر جيدًا لمعظم الحالات
+tpe_sampler:
+  seed: 42
+  consider_prior: true
+  prior_weight: 1.0
+  consider_magic_clip: true
+  consider_endpoints: false
+  n_startup_trials: 10
+  n_ei_candidates: 24
+  multivariate: false
+  group: false
+  warn_independent_sampling: true
+
+# إعدادات GP Sampler (Gaussian Process)
+# مفيد للدوال المستمرة والمكلفة حسابيًا
+gp_sampler:
+  seed: 42
+  # يمكنك إضافة معاملات أخرى هنا إذا لزم الأمر
+
+# --- إعدادات الـ Pruners ---
+
+# إعدادات ASHA Pruner (Asynchronous Successive Halving Algorithm)
+# فعال جدًا في تقليم التجارب غير الواعدة مبكرًا
+asha_pruner:
+  min_resource: 1
+  reduction_factor: 4
+  min_early_stopping_rate: 0
