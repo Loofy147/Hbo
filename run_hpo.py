@@ -2,23 +2,29 @@ import argparse
 import sys
 import time
 
-# محاولة استيراد النظام الأساسي
+# --- استيراد المكونات الأساسية من النظام الجديد ---
 try:
-    from hpo_production_system import HPOSystem
-except ImportError:
-    print("🛑 خطأ: لا يمكن استيراد 'HPOSystem' من 'hpo_production_system.py'.")
-    print("يرجى التأكد من أن الملف موجود وأن البيئة مهيأة بشكل صحيح.")
-    # سنسمح للبرنامج بالاستمرار في حالة --check أو --quick لتقديم المساعدة
-    HPOSystem = None
-
-# استيراد الأمثلة
-try:
-    from quick_start import mathematical_example
-    from examples.sklearn_example import sklearn_objective
+    # استيراد الفئات الرئيسية من hpo_production_system.py
+    from hpo_production_system import HPOSystem, SearchSpace, TrialObject
+    # استيراد الأمثلة الجاهزة من نفس الملف
+    from hpo_production_system import example_mathematical, example_ml_simulation, example_sklearn_real
+    SYSTEM_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ تحذير: لم يتم العثور على بعض الأمثلة: {e}")
-    mathematical_example = None
+    print(f"🛑 خطأ: لا يمكن استيراد المكونات الأساسية من 'hpo_production_system.py': {e}")
+    print("يرجى التأكد من أن الملف موجود وأن البيئة مهيأة بشكل صحيح.")
+    HPOSystem, SearchSpace = None, None
+    SYSTEM_AVAILABLE = False
+
+# --- استيراد دوال الهدف المنفصلة ---
+try:
+    from quick_start import mathematical_objective
+    from examples.sklearn_example import sklearn_objective
+    EXAMPLES_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ تحذير: لم يتم العثور على بعض دوال الهدف المنفصلة: {e}")
+    mathematical_objective = None
     sklearn_objective = None
+    EXAMPLES_AVAILABLE = False
 
 
 def run_check():
@@ -26,54 +32,38 @@ def run_check():
     فحص سريع للنظام والمتطلبات الأساسية.
     """
     print("=============================================")
-    print("      🔬 فحص سريع لنظام HPO")
+    print("      🔬 فحص سريع لنظام HPO (النسخة الجديدة)")
     print("=============================================")
     all_ok = True
 
     # 1. التحقق من وجود الملفات الأساسية
     print("\n[1/3] 📂 التحقق من وجود الملفات الأساسية...")
-    required_files = [
-        "run_hpo.py", "hpo_production_system.py", "install.py",
-        "requirements.txt", "quick_start.py", "examples/sklearn_example.py"
-    ]
+    required_files = ["run_hpo.py", "hpo_production_system.py", "install.py", "requirements.txt"]
     for f in required_files:
         try:
-            # هذا مجرد فحص بسيط لوجود الملف
             with open(f, 'r'): pass
             print(f"  ✅ {f}")
         except FileNotFoundError:
             print(f"  🛑 {f} (غير موجود!)")
             all_ok = False
 
-    # 2. التحقق من استيراد المكتبات
+    # 2. التحقق من استيراد المكتبات الجديدة
     print("\n[2/3] 📦 التحقق من استيراد المكتبات الأساسية...")
-    try:
-        import optuna
-        print("  ✅ Optuna")
-    except ImportError:
-        print("  🛑 Optuna (غير مثبت!)")
-        all_ok = False
-
-    try:
-        import sklearn
-        print("  ✅ Scikit-learn")
-    except ImportError:
-        print("  🛑 Scikit-learn (غير مثبت!)")
-        all_ok = False
-
-    try:
-        import numpy
-        print("  ✅ NumPy")
-    except ImportError:
-        print("  🛑 NumPy (غير مثبت!)")
-        all_ok = False
+    libs_to_check = {'numpy': 'numpy', 'pandas': 'pandas', 'sklearn': 'scikit-learn', 'matplotlib': 'matplotlib'}
+    for lib, name in libs_to_check.items():
+        try:
+            __import__(lib)
+            print(f"  ✅ {name}")
+        except ImportError:
+            print(f"  🛑 {name} (غير مثبت!)")
+            all_ok = False
 
     # 3. التحقق من جاهزية النظام
     print("\n[3/3] ⚙️ التحقق من جاهزية النظام...")
-    if HPOSystem:
-        print("  ✅ تم استيراد HPOSystem بنجاح.")
+    if SYSTEM_AVAILABLE and HPOSystem and SearchSpace:
+        print("  ✅ تم استيراد HPOSystem و SearchSpace بنجاح.")
     else:
-        print("  🛑 لم يتم استيراد HPOSystem.")
+        print("  🛑 لم يتم استيراد HPOSystem أو SearchSpace.")
         all_ok = False
 
     # الخلاصة
@@ -82,113 +72,97 @@ def run_check():
         print("🎉 فحص النظام مكتمل! كل شيء يبدو جاهزًا للانطلاق.")
     else:
         print("⚠️ تم العثور على مشاكل. يرجى مراجعة الرسائل أعلاه.")
-        print("قد تحتاج إلى تشغيل 'python install.py' لتثبيت المتطلبات.")
+        print("قد تحتاج إلى تشغيل 'python install.py' أو 'pip install -r requirements.txt'.")
     print("=============================================")
 
 
 def run_quick_example():
     """
-    تشغيل مثال رياضي بسيط وسريع.
+    تشغيل مثال رياضي بسيط وسريع باستخدام دالة الهدف المنفصلة.
     """
-    if not mathematical_example or not HPOSystem:
-        print("🛑 خطأ: المثال السريع غير متوفر. تأكد من وجود 'quick_start.py' و 'hpo_production_system.py'.")
+    if not (SYSTEM_AVAILABLE and EXAMPLES_AVAILABLE and mathematical_objective):
+        print("🛑 خطأ: المثال السريع غير متوفر. تأكد من وجود كل الملفات المطلوبة.")
         return
 
     print("=============================================")
     print("    ✨ المثال السريع: دالة رياضية بسيطة")
     print("=============================================")
-    print("الهدف: إيجاد x و y الذين يعظمان الدالة f(x, y) = -(x-3)^2 - (y+2)^2 + 10")
-    print("الحل الأمثل المعروف: x=3, y=-2, القيمة القصوى=10")
-    print("---------------------------------------------")
 
-    # تعريف مساحة البحث
-    search_space = {
-        "x": ("float", -5, 5),
-        "y": ("float", -5, 5)
-    }
+    # 1. إعداد فضاء البحث
+    search_space = SearchSpace()
+    search_space.add_uniform('x', -10, 10)
+    search_space.add_uniform('y', -10, 10)
 
-    # تهيئة النظام
+    # 2. تهيئة وتشغيل النظام
     hpo = HPOSystem(
         search_space=search_space,
-        objective_function=mathematical_example,
-        n_trials=50,
-        direction="maximize"
+        objective_function=mathematical_objective,
+        direction='maximize',
+        n_trials=30,
+        n_startup_trials=5,
+        sampler='TPE',
+        study_name='quick_start_run'
     )
 
-    print("🚀 بدء عملية التحسين...")
-    start_time = time.time()
-    best_params, best_value = hpo.optimize()
-    duration = time.time() - start_time
-
-    print("\n🎉 انتهت عملية التحسين!")
-    print(f"⏱️ المدة: {duration:.2f} ثانية")
-    print("---------------------------------------------")
-    print("📊 النتائج:")
-    print(f"  🎯 أفضل قيمة تم العثور عليها: {best_value:.4f}")
-    print(f"  ⚙️ أفضل المعاملات:")
-    print(f"    - x: {best_params['x']:.4f} (المتوقع: 3.0)")
-    print(f"    - y: {best_params['y']:.4f} (المتوقع: -2.0)")
-
-    # التحقق من الدقة
-    if abs(best_params['x'] - 3) < 0.1 and abs(best_params['y'] - (-2)) < 0.1:
-        print("\n✅ تم العثور على الحل الأمثل بدقة عالية!")
-    else:
-        print("\n⚠️ الحل قريب من الأمثل. زيادة عدد التجارب (n_trials) قد تحسن الدقة.")
+    hpo.optimize()
+    # الملخص والتحليل سيتم طباعتهما من داخل hpo.print_summary()
 
 
 def run_full_optimization():
     """
-    تشغيل مثال تحسين كامل باستخدام Scikit-learn.
+    تشغيل مثال تحسين كامل باستخدام Scikit-learn ودالة الهدف المنفصلة.
     """
-    if not sklearn_objective or not HPOSystem:
-        print("🛑 خطأ: مثال Scikit-learn غير متوفر. تأكد من وجود 'examples/sklearn_example.py'.")
+    if not (SYSTEM_AVAILABLE and EXAMPLES_AVAILABLE and sklearn_objective):
+        print("🛑 خطأ: مثال Scikit-learn غير متوفر. تأكد من وجود كل الملفات المطلوبة.")
         return
 
     print("=======================================================")
     print("  🎯 التحسين الكامل: نموذج RandomForest على بيانات Iris")
     print("=======================================================")
-    print("الهدف: إيجاد أفضل المعاملات لنموذج RandomForestClassifier لتحقيق أعلى دقة.")
-    print("-------------------------------------------------------")
 
-    # تعريف مساحة البحث
-    search_space = {
-        "n_estimators": ("int", 10, 300),
-        "max_depth": ("int", 3, 20),
-        "min_samples_split": ("int", 2, 10),
-        "max_features": ("categorical", ["sqrt", "log2"])
-    }
+    # 1. إعداد فضاء البحث
+    search_space = SearchSpace()
+    search_space.add_int('n_estimators', 10, 250)
+    search_space.add_int('max_depth', 3, 30)
+    search_space.add_int('min_samples_split', 2, 20)
+    search_space.add_categorical('max_features', ['sqrt', 'log2'])
 
-    # تهيئة النظام مع ميزات متقدمة
+    # 2. تهيئة وتشغيل النظام
     hpo = HPOSystem(
         search_space=search_space,
         objective_function=sklearn_objective,
-        n_trials=100,
-        direction="maximize",
-        sampler="TPE",  # استخدام TPE sampler
-        pruner="ASHA",   # استخدام ASHA pruner
-        n_jobs=2,        # استخدام معالجين بالتوازي
+        direction='maximize',
+        n_trials=25,
+        n_startup_trials=5,
+        sampler='TPE',
+        study_name='full_sklearn_run'
     )
 
-    print("🚀 بدء عملية التحسين (قد تستغرق بضع دقائق)...")
-    start_time = time.time()
-    best_params, best_value = hpo.optimize()
-    duration = time.time() - start_time
+    hpo.optimize()
+    # الملخص والتحليل سيتم طباعتهما من داخل hpo.print_summary()
 
-    print("\n🎉 انتهت عملية التحسين!")
-    print(f"⏱️ المدة: {duration:.2f} ثانية")
-    print("---------------------------------------------")
-    print("📊 النتائج:")
-    print(f"  🎯 أفضل دقة تم تحقيقها: {best_value:.4f}")
-    print(f"  ⚙️ أفضل المعاملات:")
-    for param, value in best_params.items():
-        print(f"    - {param}: {value}")
+def run_embedded_examples():
+    """
+    تشغيل الأمثلة المدمجة مباشرة من hpo_production_system.py
+    """
+    if not SYSTEM_AVAILABLE:
+        print("🛑 خطأ: النظام الأساسي غير متوفر.")
+        return
 
-    print("\n📈 يمكنك الآن مراجعة التقارير والرسوم البيانية التي تم إنشاؤها.")
+    print("\n\n--- [ المثال الأول المدمج: رياضي بسيط ] ---\n")
+    hpo_math = example_mathematical()
+    if hpo_math and hpo_math.stats['n_complete'] > 0:
+        hpo_math.plot_optimization_history()
+
+    print("\n\n--- [ المثال الثاني المدمج: Scikit-learn حقيقي ] ---\n")
+    hpo_sklearn = example_sklearn_real()
+    if hpo_sklearn and hpo_sklearn.stats['n_complete'] > 0:
+        hpo_sklearn.plot_optimization_history()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="🚀 نظام HPO - أداة تحسين المعاملات الفائقة",
+        description="🚀 نظام HPO - أداة تحسين المعاملات الفائقة (النسخة الجديدة)",
         formatter_class=argparse.RawTextHelpFormatter
     )
 
@@ -200,17 +174,29 @@ if __name__ == "__main__":
     parser.add_argument(
         '--quick',
         action='store_true',
-        help='✨ تشغيل مثال رياضي سريع للتحقق من أن كل شيء يعمل.'
+        help='✨ تشغيل مثال رياضي سريع (باستخدام quick_start.py).'
+    )
+    parser.add_argument(
+        '--full',
+        action='store_true',
+        help='🎯 تشغيل مثال scikit-learn كامل (باستخدام examples/sklearn_example.py).'
+    )
+    parser.add_argument(
+        '--embedded',
+        action='store_true',
+        help='🌟 تشغيل الأمثلة المدمجة في hpo_production_system.py.'
     )
 
     args = parser.parse_args()
 
-    if len(sys.argv) == 1:
-        # لا توجد وسائط، تشغيل التحسين الكامل
-        run_full_optimization()
-    elif args.check:
+    if args.check:
         run_check()
     elif args.quick:
         run_quick_example()
+    elif args.full:
+        run_full_optimization()
+    elif args.embedded:
+        run_embedded_examples()
     else:
+        # إذا لم يتم تمرير أي وسيط، نعرض المساعدة
         parser.print_help()

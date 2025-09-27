@@ -34,7 +34,6 @@ FILES_TO_COPY=(
     "start.sh"
     "start.bat"
     "examples"
-    "configs"
     "README.md"
     "QUICK_START.md"
     "Dockerfile"

@@ -29,7 +29,7 @@ if "%choice%"=="1" (
     python run_hpo.py --quick
 ) else if "%choice%"=="3" (
     echo ... Starting full optimization...
-    python run_hpo.py
+    python run_hpo.py --full
 ) else if "%choice%"=="4" (
     echo ... Installing requirements...
     if exist install.py (
