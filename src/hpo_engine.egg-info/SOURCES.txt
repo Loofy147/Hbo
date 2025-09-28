@@ -6,6 +6,7 @@ setup.py
 configs/default.yaml
 examples/01_mathematical_optimization.py
 examples/02_sklearn_optimization.py
+examples/03_advanced_examples.py
 src/hpo/__init__.py
 src/hpo/pruners.py
 src/hpo/samplers.py
@@ -17,6 +18,7 @@ src/hpo_engine.egg-info/SOURCES.txt
 src/hpo_engine.egg-info/dependency_links.txt
 src/hpo_engine.egg-info/requires.txt
 src/hpo_engine.egg-info/top_level.txt
+tests/test_advanced_optimizers.py
 tests/test_pruners.py
 tests/test_samplers.py
 tests/test_space.py

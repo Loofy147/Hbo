@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import gaussian_kde
 
 class RandomSampler:
     """
@@ -32,11 +33,13 @@ class TPESampler:
         n_startup_trials (int): The number of random trials to run before using TPE.
         n_ei_candidates (int): The number of candidates to sample for Expected Improvement.
         gamma (float): The fraction of top-performing trials to use as the 'good' set.
+        direction (str): Optimization direction, 'maximize' or 'minimize'.
     """
-    def __init__(self, n_startup_trials=10, n_ei_candidates=24, gamma=0.25):
+    def __init__(self, n_startup_trials=10, n_ei_candidates=24, gamma=0.25, direction='maximize'):
         self.n_startup_trials = n_startup_trials
         self.n_ei_candidates = n_ei_candidates
         self.gamma = gamma
+        self.direction = direction
 
     def suggest(self, trials, search_space):
         """
@@ -57,8 +60,9 @@ class TPESampler:
         if len(complete_trials) < self.n_startup_trials:
             return search_space.sample()
 
-        # Sort trials by performance (assuming maximization)
-        sorted_trials = sorted(complete_trials, key=lambda t: t.value, reverse=True)
+        # Sort trials by performance
+        is_maximize = self.direction == 'maximize'
+        sorted_trials = sorted(complete_trials, key=lambda t: t.value, reverse=is_maximize)
 
         # Split into good and bad trials
         n_good = max(1, int(len(sorted_trials) * self.gamma))
@@ -103,16 +107,19 @@ class TPESampler:
                 continue
 
             if param_config['type'] in ['uniform', 'int']:
-                # Simplified KDE: use inverse of minimum distance as a proxy for density
-                if len(param_values) > 1:
-                    distances = [abs(value - pv) for pv in param_values]
-                    # Add a small epsilon to avoid division by zero
-                    min_distance = min(distances) + 1e-10
-                    density = 1.0 / min_distance
-                    log_density += np.log(max(density, 1e-10))
-                else:
-                    # Not enough data to estimate density, neutral contribution
+                # Use Gaussian KDE for numerical parameters
+                if len(param_values) < 2:
+                    # Not enough data for KDE, neutral contribution
                     log_density += 0.0
+                else:
+                    try:
+                        # Bandwidth selection can be sensitive; default is Scott's rule.
+                        kde = gaussian_kde(param_values)
+                        density = kde.pdf([value])[0]
+                        log_density += np.log(max(density, 1e-10))
+                    except np.linalg.LinAlgError:
+                        # Can happen if all points are identical, making the matrix singular.
+                        log_density += 0.0 # Neutral contribution
 
             elif param_config['type'] == 'categorical':
                 # Calculate relative frequency with Laplace smoothing

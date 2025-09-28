@@ -4,39 +4,65 @@ from .samplers import RandomSampler, TPESampler
 from .pruners import MedianPruner, ASHAPruner
 from .space import TrialResult
 
+class TrialPruned(Exception):
+    """Exception to indicate that a trial was pruned."""
+    pass
+
 class TrialObject:
     """
     An object passed to the objective function, providing an interface for the trial.
 
-    This object allows the objective function to suggest hyperparameter values dynamically
-    and access information about the trial.
+    This object allows the objective function to suggest hyperparameter values, report
+    intermediate results for pruning, and access information about the trial.
 
     Attributes:
         trial_id (int): The unique identifier for the trial.
         params (dict): A dictionary of hyperparameters for the current trial.
     """
-    def __init__(self, trial_id, params):
+    def __init__(self, study, trial_id, params):
+        self._study = study
         self.trial_id = trial_id
         self.params = params
 
     def suggest_float(self, name, low, high, log=False):
         """Suggests a float value for a hyperparameter."""
-        if name in self.params:
-            return self.params[name]
-        # This is a fallback, real suggestion should happen in the Study
-        return np.random.uniform(low, high)
+        return self.params[name]
 
     def suggest_int(self, name, low, high):
         """Suggests an integer value for a hyperparameter."""
-        if name in self.params:
-            return self.params[name]
-        return np.random.randint(low, high + 1)
+        return self.params[name]
 
     def suggest_categorical(self, name, choices):
         """Suggests a categorical value for a hyperparameter."""
-        if name in self.params:
-            return self.params[name]
-        return np.random.choice(choices)
+        return self.params[name]
+
+    def report(self, value, step):
+        """
+        Reports an intermediate objective value for the trial.
+
+        This allows the pruner to evaluate the trial's performance at intermediate
+        steps and decide whether to stop it early.
+
+        Args:
+            value (float): The intermediate objective value.
+            step (int): The current step (e.g., epoch, batch number).
+        """
+        if self._study.pruner and self._study.pruner.should_prune(self.trial_id, step, value, self._study.trials):
+            raise TrialPruned(f"Trial {self.trial_id} pruned at step {step} with value {value}.")
+
+    def should_prune(self):
+        """
+        Asks the study's pruner if the trial should be pruned.
+
+        This method is for more advanced use cases where the trial itself needs
+        to check if it should stop. Most users should use `report()`.
+
+        Returns:
+            bool: True if the trial should be pruned, False otherwise.
+        """
+        # This method is not fully implemented in this version but provides a hook
+        # for future, more complex pruning strategies.
+        return False
 
 class Study:
     """
@@ -66,6 +92,7 @@ class Study:
         self.n_trials = n_trials
         self.study_name = study_name
         self.verbose = verbose
+        self.pruner_active = pruner is not None
 
         # Initialize components
         if sampler == 'TPE':
@@ -74,9 +101,9 @@ class Study:
             self.sampler = RandomSampler()
 
         if pruner == 'ASHA':
-            self.pruner = ASHAPruner()
+            self.pruner = ASHAPruner(direction=self.direction)
         elif pruner == 'Median':
-            self.pruner = MedianPruner()
+            self.pruner = MedianPruner(direction=self.direction)
         else:
             self.pruner = None
 
@@ -112,12 +139,22 @@ class Study:
                 method = 'TPE' if isinstance(self.sampler, TPESampler) and trial_num >= self.sampler.n_startup_trials else 'Random'
 
                 trial_id = f"trial_{trial_num:03d}"
-                trial_obj = TrialObject(trial_id, params)
+                trial_obj = TrialObject(self, trial_id, params)
 
                 start_time = time.time()
+                value = None
+                state = 'RUNNING'
+
                 try:
                     value = self.objective_function(trial_obj)
                     state = 'COMPLETE'
+                except TrialPruned as e:
+                    if self.verbose:
+                        print(f" pruned Trial {trial_num}: {e}")
+                    state = 'PRUNED'
+                    # The value is the last reported intermediate value, which is not directly accessible here.
+                    # We will rely on the pruner implementation to store it if needed. For now, it's None.
+                    value = None # Or retrieve last reported value if pruner stores it
                 except Exception as e:
                     if self.verbose:
                         print(f"❌ Trial {trial_num} failed: {e}")
@@ -173,21 +210,27 @@ class Study:
     def _print_trial_result(self, trial, trial_num, method):
         if trial.state == 'COMPLETE':
             is_best = trial == self.best_trial
-            icon = "🎯" if is_best else "  "
+            icon = "🎯" if is_best else "✅"
+            value_str = f"{trial.value:.4f}" if trial.value is not None else "N/A"
+        elif trial.state == 'PRUNED':
+            icon = " pruned"
+            value_str = "pruned"
+        else:
+            return # Don't print running or failed trials in the main loop log
 
-            params_str = []
-            for name, value in list(trial.params.items())[:3]:
-                if isinstance(value, float):
-                    params_str.append(f"{name}={value:.4f}")
-                else:
-                    params_str.append(f"{name}={value}")
-            params_display = " | ".join(params_str)
-            if len(trial.params) > 3:
-                params_display += "..."
+        params_str = []
+        for name, value in list(trial.params.items())[:3]:
+            if isinstance(value, float):
+                params_str.append(f"{name}={value:.4f}")
+            else:
+                params_str.append(f"{name}={value}")
+        params_display = " | ".join(params_str)
+        if len(trial.params) > 3:
+            params_display += "..."
 
-            print(f"{icon} #{trial_num:3d} ({method:>6s}) | "
-                  f"Value: {trial.value:.4f} | {params_display} | "
-                  f"Time: {trial.duration:.1f}s")
+        print(f"{icon} #{trial_num:3d} ({method:>6s}) | "
+              f"Value: {value_str} | {params_display} | "
+              f"Time: {trial.duration:.1f}s")
 
     def print_summary(self):
         print("\n" + "="*70)
@@ -209,6 +252,7 @@ class Study:
         print(f"\n📊 Statistics:")
         print(f"   Total Trials: {len(self.trials)}")
         print(f"   Completed: {self.stats['n_complete']}")
+        print(f"   Pruned: {self.stats['n_pruned']}")
         print(f"   Failed: {self.stats['n_failed']}")
         print(f"   Total Time: {self.stats['total_time']:.1f}s")
 
