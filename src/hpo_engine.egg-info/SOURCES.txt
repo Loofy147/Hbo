@@ -1,12 +1,14 @@
 MANIFEST.in
 README.md
 dev-requirements.txt
+pyproject.toml
 requirements.txt
 setup.py
 configs/default.yaml
 examples/01_mathematical_optimization.py
 examples/02_sklearn_optimization.py
 examples/03_advanced_examples.py
+examples/advanced_optimizers_demo.py
 src/hpo/__init__.py
 src/hpo/pruners.py
 src/hpo/samplers.py
