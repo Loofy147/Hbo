@@ -6,15 +6,17 @@ class MedianPruner:
 
     This pruner compares the intermediate values of a trial against the median
     of all previously reported values at the same step and prunes if the current
-    trial's performance is below the median.
+    trial's performance is below (for maximization) or above (for minimization) the median.
 
     Attributes:
         n_startup_trials (int): Number of trials to complete before pruning is active.
         n_warmup_steps (int): Minimum number of steps before a trial can be pruned.
+        direction (str): Optimization direction, 'maximize' or 'minimize'.
     """
-    def __init__(self, n_startup_trials=5, n_warmup_steps=10):
+    def __init__(self, n_startup_trials=5, n_warmup_steps=10, direction='maximize'):
         self.n_startup_trials = n_startup_trials
         self.n_warmup_steps = n_warmup_steps
+        self.direction = direction
         self.step_values = {}  # Stores {step: [values]}
 
     def should_prune(self, trial_id, step, value, completed_trials):
@@ -46,7 +48,10 @@ class MedianPruner:
 
         # Prune if the current value is worse than the median
         median_value = np.median(step_history)
-        return value < median_value
+        if self.direction == 'maximize':
+            return value < median_value
+        else: # minimize
+            return value > median_value
 
 class ASHAPruner:
     """
@@ -60,11 +65,13 @@ class ASHAPruner:
         min_resource (int): The minimum resource (e.g., epochs) allocated to a trial.
         max_resource (int): The maximum resource a trial can be allocated.
         reduction_factor (int): The factor by which the number of trials is reduced at each rung.
+        direction (str): Optimization direction, 'maximize' or 'minimize'.
     """
-    def __init__(self, min_resource=1, max_resource=100, reduction_factor=3):
+    def __init__(self, min_resource=1, max_resource=100, reduction_factor=3, direction='maximize'):
         self.min_resource = min_resource
         self.max_resource = max_resource
         self.reduction_factor = reduction_factor
+        self.direction = direction
 
         # Calculate the rungs (evaluation levels)
         self.rungs = []
@@ -77,7 +84,7 @@ class ASHAPruner:
         # Store results for each rung
         self.rung_results = {rung: [] for rung in self.rungs}
 
-    def should_prune(self, trial_id, step, value):
+    def should_prune(self, trial_id, step, value, completed_trials=None):
         """
         Determines whether a trial should be pruned at a given step (resource level).
 
@@ -85,6 +92,7 @@ class ASHAPruner:
             trial_id (int): The ID of the current trial.
             step (int): The current resource level (e.g., number of epochs).
             value (float): The objective value at the current step.
+            completed_trials (list): Not used by ASHA, but kept for consistent interface.
 
         Returns:
             bool: True if the trial should be pruned, False otherwise.
@@ -107,11 +115,17 @@ class ASHAPruner:
         if len(rung_values) >= self.reduction_factor:
             # Determine the performance threshold for this rung
             threshold_index = len(rung_values) // self.reduction_factor
-            # Sort descending to find the cut-off point
-            sorted_values = sorted(rung_values, reverse=True)
+
+            # Sort descending for maximization, ascending for minimization
+            is_maximize = self.direction == 'maximize'
+            sorted_values = sorted(rung_values, reverse=is_maximize)
+
             threshold = sorted_values[threshold_index - 1] if threshold_index > 0 else sorted_values[0]
 
-            # Prune if the current trial's value is below the threshold
-            return value < threshold
+            # Prune if the current trial's value is worse than the threshold
+            if is_maximize:
+                return value < threshold
+            else:
+                return value > threshold
 
         return False
