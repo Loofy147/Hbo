@@ -29,6 +29,7 @@ Requires-Dist: pytest-cov; extra == "dev"
 Requires-Dist: flake8; extra == "dev"
 Requires-Dist: black; extra == "dev"
 Requires-Dist: isort; extra == "dev"
+Requires-Dist: optuna; extra == "dev"
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
