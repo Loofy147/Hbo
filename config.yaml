@@ -1,0 +1,83 @@
+defaults:
+  profile: gpu16
+
+profiles:
+  cpu_small:
+    device: cpu
+    pop_size: 8
+    generations: 10
+    num_islands: 2
+    migrate_every: 4
+    migration_k: 1
+    epochs_proxy: 1
+    epochs_full: 8
+    multi_fidelity: true
+    surrogate_warmup: 40
+    batch_size: 64
+
+  colab_8gb:
+    device: cuda
+    gpu_mem_gb: 8
+    pop_size: 12
+    generations: 12
+    num_islands: 2
+    migrate_every: 4
+    migration_k: 1
+    epochs_proxy: 2
+    epochs_full: 10
+    multi_fidelity: true
+    surrogate_warmup: 50
+    batch_size: 64
+
+  gpu16:
+    device: cuda
+    gpu_mem_gb: 16
+    pop_size: 24
+    generations: 20
+    num_islands: 4
+    migrate_every: 5
+    migration_k: 2
+    epochs_proxy: 3
+    epochs_full: 12
+    multi_fidelity: true
+    surrogate_warmup: 80
+    batch_size: 128
+
+logging:
+  wandb: true
+  project: spoknas-experiments-v2
+  save_checkpoints_every_gen: 5
+  out_dir: results/
+
+fitness:
+  w_accuracy: 1.0
+  w_params: 0.12
+  w_flops: 0.18
+  rf_bonus_coef: 0.25
+
+surrogate:
+  enabled: true
+  model: random_forest
+  n_estimators: 200
+  acquisition: ei
+  retrain_every: 5
+
+optimizer:
+  mutation_rate: 0.06
+  crossover_rate: 0.6
+  elitism: 2
+  max_genome_len: 16
+  layer_library:
+    - conv3x3-16
+    - conv3x3-32
+    - conv3x3-64
+    - sep_conv3x3-32
+    - sep_conv3x3-64
+    - pool-max
+    - pool-avg
+    - bn
+    - relu
+    - flatten
+    - global_pool_avg
+    - fc-64
+    - fc-128
