@@ -8,3 +8,8 @@ profile = "black"
 [tool.mypy]
 files = "src"
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
