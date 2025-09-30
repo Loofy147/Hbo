@@ -1,17 +1,18 @@
+# Core HPO and SpokNAS Dependencies
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+seaborn
 torch>=2.1
 torchvision
-numpy
-scikit-learn
 tqdm
 pyyaml
-matplotlib
-pandas
 wandb
 transformers
 peft
 accelerate
 faiss-cpu
 safetensors
-pytest
-black
-isort
+optuna
