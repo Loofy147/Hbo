@@ -20,6 +20,7 @@ def main():
             "  - 'math': Run the basic mathematical optimization example.\n"
             "  - 'sklearn': Run the Scikit-learn RandomForest optimization example.\n"
             "  - 'advanced': Run the advanced, domain-specific examples.\n"
+            "  - 'quantum': Run the Unified Quantum HPO example.\n"
             "  - 'all' (default): Run all available examples sequentially."
         )
     )
@@ -72,6 +73,19 @@ def main():
         except Exception as e:
             print(f"❌ An error occurred during the advanced examples: {e}")
 
+    def run_quantum_example():
+        print("\n" + "="*50)
+        print("    🚀 Running: Unified Quantum HPO Example")
+        print("="*50)
+        try:
+            quantum_module = import_module("examples.04_quantum_hpo_example")
+            quantum_module.main()
+            print("✅ Quantum HPO example finished successfully.")
+        except ImportError as e:
+            print(f"❌ Error: Could not import the quantum HPO example: {e}. A dependency might be missing.")
+        except Exception as e:
+            print(f"❌ An error occurred during the quantum HPO example: {e}")
+
 
     # --- Execute selected example ---
     if args.example == 'math':
@@ -80,10 +94,13 @@ def main():
         run_sklearn_example()
     elif args.example == 'advanced':
         run_advanced_example()
+    elif args.example == 'quantum':
+        run_quantum_example()
     elif args.example == 'all':
         run_math_example()
         run_sklearn_example()
         run_advanced_example()
+        run_quantum_example()
         print("\n" + "="*50)
         print("🎉 All examples completed.")
         print("="*50)
